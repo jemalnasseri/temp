@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ChevronRight, Calendar, Clock, User, Check } from "lucide-react";
 import { Button } from "./ui/button";
@@ -101,6 +101,15 @@ const PublicBookingPage = () => {
   const handleServiceSelect = (service: Service) => {
     setSelectedService(service);
     setCurrentStep(2);
+
+    // Add animation effect
+    const element = document.getElementById("booking-container");
+    if (element) {
+      element.classList.add("pulse-animation");
+      setTimeout(() => {
+        element.classList.remove("pulse-animation");
+      }, 500);
+    }
   };
 
   // Handle date selection
@@ -122,13 +131,73 @@ const PublicBookingPage = () => {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // If field has been touched, validate on change
+    if (formTouched[name]) {
+      validateField(name, value);
+    }
+  };
+
+  // Form validation state
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [formTouched, setFormTouched] = useState<Record<string, boolean>>({});
+
+  // Handle input blur for validation
+  const handleBlur = (field: string) => {
+    setFormTouched((prev) => ({ ...prev, [field]: true }));
+    validateField(field, formData[field as keyof BookingFormData]);
+  };
+
+  // Validate a single field
+  const validateField = (field: string, value: string) => {
+    let error = "";
+
+    switch (field) {
+      case "name":
+        if (!value.trim()) error = "Name is required";
+        else if (value.trim().length < 3)
+          error = "Name must be at least 3 characters";
+        break;
+      case "phone":
+        if (!value.trim()) error = "Phone number is required";
+        else if (!/^[\d\+\-\(\)\s]{10,15}$/.test(value))
+          error = "Please enter a valid phone number";
+        break;
+      case "email":
+        if (!value.trim()) error = "Email is required";
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
+          error = "Please enter a valid email address";
+        break;
+    }
+
+    setFormErrors((prev) => ({ ...prev, [field]: error }));
+    return !error;
+  };
+
+  // Validate all fields
+  const validateForm = () => {
+    const fields = ["name", "phone", "email"];
+    let isValid = true;
+
+    fields.forEach((field) => {
+      const value = formData[field as keyof BookingFormData];
+      if (!validateField(field, value)) {
+        isValid = false;
+      }
+      setFormTouched((prev) => ({ ...prev, [field]: true }));
+    });
+
+    return isValid;
   };
 
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, you would submit the booking data to your backend
-    setCurrentStep(5); // Move to confirmation step
+
+    if (validateForm()) {
+      // In a real app, you would submit the booking data to your backend
+      setCurrentStep(5); // Move to confirmation step
+    }
   };
 
   // Generate dates for the next 7 days
@@ -154,8 +223,45 @@ const PublicBookingPage = () => {
 
   const dates = generateDates();
 
+  // Add custom animation styles
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.innerHTML = `
+      @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.02); }
+        100% { transform: scale(1); }
+      }
+      .pulse-animation {
+        animation: pulse 0.5s ease-in-out;
+      }
+      .input-error-shake {
+        animation: shake 0.5s ease-in-out;
+      }
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+      }
+      .form-field-appear {
+        animation: fadeIn 0.5s ease-in-out;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div
+      id="booking-container"
+      className="min-h-screen bg-background flex flex-col"
+    >
       {/* Header */}
       <header className="bg-primary text-primary-foreground py-6 px-4 md:px-6">
         <div className="container mx-auto">
@@ -407,8 +513,19 @@ const PublicBookingPage = () => {
                           placeholder="Enter your full name"
                           value={formData.name}
                           onChange={handleInputChange}
+                          onBlur={() => handleBlur("name")}
+                          className={
+                            formTouched.name && formErrors.name
+                              ? "border-red-500 focus-visible:ring-red-500"
+                              : ""
+                          }
                           required
                         />
+                        {formTouched.name && formErrors.name && (
+                          <p className="text-sm text-red-500 mt-1">
+                            {formErrors.name}
+                          </p>
+                        )}
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="phone">Phone Number</Label>
@@ -418,8 +535,19 @@ const PublicBookingPage = () => {
                           placeholder="Enter your phone number"
                           value={formData.phone}
                           onChange={handleInputChange}
+                          onBlur={() => handleBlur("phone")}
+                          className={
+                            formTouched.phone && formErrors.phone
+                              ? "border-red-500 focus-visible:ring-red-500"
+                              : ""
+                          }
                           required
                         />
+                        {formTouched.phone && formErrors.phone && (
+                          <p className="text-sm text-red-500 mt-1">
+                            {formErrors.phone}
+                          </p>
+                        )}
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="email">Email Address</Label>
@@ -430,8 +558,19 @@ const PublicBookingPage = () => {
                           placeholder="Enter your email address"
                           value={formData.email}
                           onChange={handleInputChange}
+                          onBlur={() => handleBlur("email")}
+                          className={
+                            formTouched.email && formErrors.email
+                              ? "border-red-500 focus-visible:ring-red-500"
+                              : ""
+                          }
                           required
                         />
+                        {formTouched.email && formErrors.email && (
+                          <p className="text-sm text-red-500 mt-1">
+                            {formErrors.email}
+                          </p>
+                        )}
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="notes">
@@ -445,8 +584,18 @@ const PublicBookingPage = () => {
                           onChange={handleInputChange}
                         />
                       </div>
-                      <Button type="submit" className="w-full mt-4">
-                        Confirm Booking
+                      <Button
+                        type="submit"
+                        className="w-full mt-4"
+                        disabled={
+                          Object.values(formErrors).some((error) => error) &&
+                          Object.values(formTouched).some((touched) => touched)
+                        }
+                      >
+                        {Object.values(formErrors).some((error) => error) &&
+                        Object.values(formTouched).some((touched) => touched)
+                          ? "Please fix form errors"
+                          : "Confirm Booking"}
                       </Button>
                     </div>
                   </form>
